@@ -1,0 +1,12 @@
+{
+  "name": "sarangui-yeontan-cheonsa",
+  "version": "1.0.0",
+  "description": "사랑의 연탄천사 봉사단체 웹사이트 백엔드 (봉사신청 게시판 API)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
