@@ -577,52 +577,67 @@
       <button class="modal-close" id="closeWriteBtn" type="button" aria-label="닫기">✕</button>
     </div>
     <form id="writeForm" class="wform">
+      <div class="wf-row" id="wNoticeRow" hidden>
+        <label class="wf-label">관리자</label>
+        <label class="wf-check"><input type="checkbox" id="wNotice"> 공지로 등록 (게시판 상단에 고정)</label>
+      </div>
+
       <div class="wf-row">
         <label class="wf-label">제목 <span class="req">*</span></label>
         <input type="text" id="wTitle" placeholder="신청합니다" required>
       </div>
 
-      <div class="wf-row">
+      <div class="wf-row" id="wNoticeContentRow" hidden>
+        <label class="wf-label">공지 내용</label>
+        <textarea id="wNoticeContent" placeholder="공지 내용을 입력하세요"></textarea>
+      </div>
+
+      <div class="wf-row" id="wSecretRow">
         <label class="wf-label">옵션</label>
         <label class="wf-check"><input type="checkbox" id="wSecret" checked> 비밀글</label>
       </div>
 
-      <div class="wf-row">
+      <div class="wf-row" id="wAuthorRow">
         <label class="wf-label">작성자 <span class="req">*</span></label>
         <input type="text" id="wAuthor" placeholder="작성자명" required>
       </div>
 
-      <div class="wf-row">
+      <div class="wf-row" id="wPasswordRow">
         <label class="wf-label">비밀번호 <span class="req">*</span></label>
         <input type="password" id="wPassword" placeholder="글 확인 시 필요한 비밀번호" required>
       </div>
 
-      <div class="wf-row">
+      <div class="wf-row" id="wOrgRow">
         <label class="wf-label">이름/단체명 <span class="req">*</span></label>
         <input type="text" id="wOrg" required>
       </div>
 
-      <div class="wf-row">
+      <div class="wf-row" id="wPhoneRow">
         <label class="wf-label">휴대전화번호 <span class="req">*</span></label>
         <input type="tel" id="wPhone" placeholder="010-0000-0000" required>
       </div>
 
-      <div class="wf-row">
+      <div class="wf-row" id="wEmergencyRow">
         <label class="wf-label">비상연락처 <span class="req">*</span></label>
         <input type="tel" id="wEmergency" placeholder="010-0000-0000" required>
       </div>
 
-      <div class="wf-row">
+      <div class="wf-row" id="wHopeDateRow">
         <label class="wf-label">희망날짜 <span class="req">*</span></label>
         <input type="text" id="wHopeDate" placeholder="예: 9월 20일" required>
       </div>
 
-      <div class="wf-row">
+      <div class="wf-row" id="wHeadcountRow">
         <label class="wf-label">인원 <span class="req">*</span></label>
         <input type="number" id="wHeadcount" min="1" placeholder="예: 2" required>
       </div>
 
-      <div class="privacy-box">
+      <div class="wf-row" id="wContentRow">
+        <label class="wf-label">내용</label>
+        <textarea id="wContent" placeholder="전달하고 싶은 내용이 있다면 자유롭게 적어주세요 (선택)"></textarea>
+      </div>
+
+      <div class="privacy-box" id="wPrivacyBox">
         <h4>개인정보의 수집 및 이용목적</h4>
         <p>- 서비스 이용에 따른 본인식별, 실명확인, 가입의사 확인, 연령제한 서비스 이용<br>
            - 고지사항 전달, 불만처리 의사소통 경로 확보, 물품배송 시 정확한 배송지 정보 확보<br>
@@ -636,12 +651,12 @@
         <p>- 봉사활동 종료 후 1년간 보관하며, 이후 지체없이 파기합니다.</p>
       </div>
 
-      <div class="wf-row">
+      <div class="wf-row" id="wAgreeRow">
         <label class="wf-label">개인정보약관 <span class="req">*</span></label>
         <label class="wf-check"><input type="checkbox" id="wAgree" required> 개인정보수집 및 이용에 동의합니다.</label>
       </div>
 
-      <button type="submit" class="btn btn-primary">봉사신청</button>
+      <button type="submit" class="btn btn-primary" id="wSubmitBtn">봉사신청</button>
     </form>
   </div>
 </div>
@@ -1059,12 +1074,17 @@
     function tryStoredAdminKey(){
       var stored = null;
       try { stored = localStorage.getItem(ADMIN_KEY_STORAGE); } catch (e) { /* 접근 불가 시 무시 */ }
-      if (!stored) { return; }
+      if (!stored) { boardAdminKey = null; updateNoticeCheckboxVisibility(); return; }
       fetch(VERIFY_API, { method: 'POST', headers: { 'x-admin-key': stored } })
         .then(function(res){
-          if (res.ok) { boardAdminKey = stored; }
+          boardAdminKey = res.ok ? stored : null;
+          updateNoticeCheckboxVisibility();
         })
-        .catch(function(){ /* 확인 실패 시 일반 방문자로 동작 */ });
+        .catch(function(){ boardAdminKey = null; updateNoticeCheckboxVisibility(); });
+    }
+    function updateNoticeCheckboxVisibility(){
+      var row = document.getElementById('wNoticeRow');
+      if (row) { row.hidden = !boardAdminKey; }
     }
     tryStoredAdminKey();
 
@@ -1109,8 +1129,8 @@
         var tr = document.createElement('tr');
         if(highlightId && p.id === highlightId){ tr.classList.add('new-row'); }
         tr.innerHTML =
-          '<td class="c-num">' + p.id + '</td>' +
-          '<td class="c-title">' + (p.secret ? '<span class="lock">🔒</span>' : '') + escapeHtml(p.title) + '</td>' +
+          '<td class="c-num">' + (p.pinned ? '📌' : p.id) + '</td>' +
+          '<td class="c-title">' + (p.pinned ? '<span class="pin-tag">공지</span>' : '') + (p.secret ? '<span class="lock">🔒</span>' : '') + escapeHtml(p.title) + '</td>' +
           '<td class="c-author">' + escapeHtml(p.author) + '</td>' +
           '<td class="c-date">' + p.date + '</td>' +
           '<td class="c-views">' + p.views + '</td>';
@@ -1238,16 +1258,61 @@
       detail.className = 'detail-row';
       var td = document.createElement('td');
       td.colSpan = 5;
-      td.innerHTML =
-        '<dl class="detail-grid">' +
-          '<dt>이름/단체명</dt><dd>' + escapeHtml(full.orgName || '-') + '</dd>' +
-          '<dt>휴대전화번호</dt><dd>' + escapeHtml(full.phone || '-') + '</dd>' +
-          '<dt>비상연락처</dt><dd>' + escapeHtml(full.emergency || '-') + '</dd>' +
-          '<dt>희망날짜</dt><dd>' + escapeHtml(full.hopeDate || '-') + '</dd>' +
-          '<dt>인원</dt><dd>' + escapeHtml(String(full.headcount || '-')) + '</dd>' +
-        '</dl>';
+
+      if (full.pinned) {
+        var contentHtml = escapeHtml(full.content || '').replace(/\n/g, '<br>');
+        var actionsHtml = '';
+        if (boardAdminKey) {
+          actionsHtml =
+            '<div style="margin-top:16px;display:flex;gap:14px;">' +
+              '<button type="button" class="cal-link-btn notice-unpin-btn">고정 해제</button>' +
+              '<button type="button" class="cal-link-btn notice-delete-btn">삭제</button>' +
+            '</div>';
+        }
+        td.innerHTML =
+          '<div style="padding:6px 2px;white-space:pre-wrap;line-height:1.8;">' + contentHtml + '</div>' + actionsHtml;
+      } else {
+        var extraContent = full.content
+          ? '<dt>내용</dt><dd style="white-space:pre-wrap;">' + escapeHtml(full.content).replace(/\n/g, '<br>') + '</dd>'
+          : '';
+        td.innerHTML =
+          '<dl class="detail-grid">' +
+            '<dt>이름/단체명</dt><dd>' + escapeHtml(full.orgName || '-') + '</dd>' +
+            '<dt>휴대전화번호</dt><dd>' + escapeHtml(full.phone || '-') + '</dd>' +
+            '<dt>비상연락처</dt><dd>' + escapeHtml(full.emergency || '-') + '</dd>' +
+            '<dt>희망날짜</dt><dd>' + escapeHtml(full.hopeDate || '-') + '</dd>' +
+            '<dt>인원</dt><dd>' + escapeHtml(String(full.headcount || '-')) + '</dd>' +
+            extraContent +
+          '</dl>';
+      }
       detail.appendChild(td);
       tr.after(detail);
+
+      if (full.pinned && boardAdminKey) {
+        var unpinBtn = td.querySelector('.notice-unpin-btn');
+        var delBtn = td.querySelector('.notice-delete-btn');
+        if (unpinBtn) {
+          unpinBtn.addEventListener('click', function(){
+            fetch(API + '/' + full.id + '/pin', {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json', 'x-admin-key': boardAdminKey },
+              body: JSON.stringify({ pinned: false }),
+            })
+              .then(function(res){ if(!res.ok){ throw new Error('처리 실패'); } return res.json(); })
+              .then(function(){ closeExistingDetail(); loadPosts(); })
+              .catch(function(){ alert('고정 해제에 실패했습니다.'); });
+          });
+        }
+        if (delBtn) {
+          delBtn.addEventListener('click', function(){
+            if(!confirm('이 공지를 삭제할까요?')) { return; }
+            fetch(API + '/' + full.id, { method: 'DELETE', headers: { 'x-admin-key': boardAdminKey } })
+              .then(function(res){ if(!res.ok){ throw new Error('삭제 실패'); } return res.json(); })
+              .then(function(){ closeExistingDetail(); loadPosts(); })
+              .catch(function(){ alert('삭제에 실패했습니다.'); });
+          });
+        }
+      }
     }
 
     function loadPosts(){
@@ -1271,8 +1336,69 @@
     document.getElementById('closeWriteBtn').addEventListener('click', function(){ writeModal.classList.remove('open'); });
     writeModal.addEventListener('click', function(e){ if(e.target === writeModal){ writeModal.classList.remove('open'); } });
 
+    var noticeFieldRowIds = ['wSecretRow','wAuthorRow','wPasswordRow','wOrgRow','wPhoneRow','wEmergencyRow','wHopeDateRow','wHeadcountRow','wContentRow','wPrivacyBox','wAgreeRow'];
+    var noticeRequiredIds = ['wAuthor','wPassword','wOrg','wPhone','wEmergency','wHopeDate','wHeadcount','wAgree'];
+
+    function applyNoticeMode(){
+      var isNotice = document.getElementById('wNotice').checked;
+      noticeFieldRowIds.forEach(function(id){
+        var el = document.getElementById(id);
+        if (el) { el.hidden = isNotice; }
+      });
+      noticeRequiredIds.forEach(function(id){
+        var el = document.getElementById(id);
+        if (el) { el.required = !isNotice; }
+      });
+      document.getElementById('wNoticeContentRow').hidden = !isNotice;
+      document.getElementById('wSubmitBtn').textContent = isNotice ? '공지 등록' : '봉사신청';
+    }
+    var wNoticeCheckbox = document.getElementById('wNotice');
+    if (wNoticeCheckbox) { wNoticeCheckbox.addEventListener('change', applyNoticeMode); }
+
     document.getElementById('writeForm').addEventListener('submit', function(e){
       e.preventDefault();
+
+      var isNotice = boardAdminKey && document.getElementById('wNotice').checked;
+      var submitBtn = e.target.querySelector('button[type="submit"]');
+
+      if (isNotice) {
+        var title = document.getElementById('wTitle').value.trim();
+        if (!title) { alert('제목을 입력해 주세요.'); return; }
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = '등록 중...';
+
+        fetch(API, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-admin-key': boardAdminKey },
+          body: JSON.stringify({
+            title: title,
+            pinned: true,
+            content: document.getElementById('wNoticeContent').value,
+          }),
+        })
+          .then(function(res){
+            if (!res.ok) { return res.json().then(function(err){ throw new Error(err.error || '등록 실패'); }); }
+            return res.json();
+          })
+          .then(function(newPost){
+            currentPage = 1;
+            loadPosts().then(function(){ renderPosts(newPost.id); });
+            e.target.reset();
+            document.getElementById('wSecret').checked = true;
+            applyNoticeMode();
+            writeModal.classList.remove('open');
+          })
+          .catch(function(err){
+            console.error('공지 등록 실패', err);
+            alert(err.message || '공지 등록에 실패했습니다.');
+          })
+          .finally(function(){
+            submitBtn.disabled = false;
+            submitBtn.textContent = isNotice ? '공지 등록' : '봉사신청';
+          });
+        return;
+      }
 
       var payload = {
         title: document.getElementById('wTitle').value.trim(),
@@ -1284,6 +1410,7 @@
         emergency: document.getElementById('wEmergency').value.trim(),
         hopeDate: document.getElementById('wHopeDate').value.trim(),
         headcount: document.getElementById('wHeadcount').value,
+        content: document.getElementById('wContent').value.trim(),
         agree: document.getElementById('wAgree').checked
       };
 
@@ -1297,7 +1424,6 @@
         return;
       }
 
-      var submitBtn = e.target.querySelector('button[type="submit"]');
       submitBtn.disabled = true;
       submitBtn.textContent = '등록 중...';
 
