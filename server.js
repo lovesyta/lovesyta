@@ -147,20 +147,21 @@ function toPublic(post) {
     date: post.date,
     views: post.views,
     secret: !!post.secret,
+    pinned: !!post.pinned,
   };
 }
 
 // ---------- API ----------
 
-// 봉사신청 목록 조회 (최신순) — 개인정보 필드는 응답에 포함되지 않음
+// 봉사신청 목록 조회 (고정 공지가 맨 위, 그다음 최신순) — 개인정보 필드는 응답에 포함되지 않음
 app.get('/api/posts', (req, res) => {
-  const posts = readData()
-    .sort((a, b) => b.id - a.id)
-    .map(toPublic);
-  res.json(posts);
+  const all = readData();
+  const pinned = all.filter((p) => p.pinned).sort((a, b) => b.id - a.id);
+  const rest = all.filter((p) => !p.pinned).sort((a, b) => b.id - a.id);
+  res.json([...pinned, ...rest].map(toPublic));
 });
 
-// 봉사신청 등록
+// 봉사신청 등록 — 관리자는 pinned:true 로 개인정보 없이 "공지"를 등록할 수 있음(상단 고정)
 app.post('/api/posts', (req, res) => {
   const {
     title,
@@ -172,7 +173,37 @@ app.post('/api/posts', (req, res) => {
     emergency,
     hopeDate,
     headcount,
+    pinned,
+    content,
   } = req.body || {};
+
+  if (pinned) {
+    const adminKey = req.get('x-admin-key');
+    if (!adminKey || adminKey !== ADMIN_KEY) {
+      return res.status(401).json({ error: '공지 등록은 관리자만 가능합니다.' });
+    }
+    if (!title || !String(title).trim()) {
+      return res.status(400).json({ error: '제목을 입력해 주세요.' });
+    }
+
+    const posts = readData();
+    const nextId = posts.length ? Math.max(...posts.map((p) => p.id)) + 1 : 1;
+    const newNotice = {
+      id: nextId,
+      title: String(title).trim(),
+      secret: false,
+      password: null,
+      author: '관리자',
+      date: formatDate(new Date()),
+      views: 0,
+      pinned: true,
+      content: content ? String(content) : '',
+      orgName: '', phone: '', emergency: '', hopeDate: '', headcount: '',
+    };
+    posts.push(newNotice);
+    writeData(posts);
+    return res.status(201).json(toPublic(newNotice));
+  }
 
   const required = { title, author, orgName, phone, emergency, hopeDate, headcount };
   for (const [key, value] of Object.entries(required)) {
@@ -196,6 +227,8 @@ app.post('/api/posts', (req, res) => {
     author: maskName(author),
     date: formatDate(new Date()),
     views: 0,
+    pinned: false,
+    content: content ? String(content).trim() : '',
     // 개인정보 항목 — 목록/일반 응답에는 절대 노출되지 않고, 비밀번호 확인 후에만 전달됨
     orgName: String(orgName).trim(),
     phone: String(phone).trim(),
@@ -239,12 +272,40 @@ app.patch('/api/posts/:id/view', (req, res) => {
     author: post.author,
     date: post.date,
     views: post.views,
+    pinned: !!post.pinned,
+    content: post.content || '',
     orgName: post.orgName,
     phone: post.phone,
     emergency: post.emergency,
     hopeDate: post.hopeDate,
     headcount: post.headcount,
   });
+});
+
+// 게시글 삭제 (관리자만 가능) — 공지 정리나 스팸 신청 삭제에 사용
+app.delete('/api/posts/:id', requireAdmin, (req, res) => {
+  const id = Number(req.params.id);
+  const posts = readData();
+  const next = posts.filter((p) => p.id !== id);
+  if (next.length === posts.length) {
+    return res.status(404).json({ error: '게시글을 찾을 수 없습니다.' });
+  }
+  writeData(next);
+  res.json({ ok: true });
+});
+
+// 공지 고정/고정 해제 (관리자만 가능)
+app.patch('/api/posts/:id/pin', requireAdmin, (req, res) => {
+  const id = Number(req.params.id);
+  const { pinned } = req.body || {};
+  const posts = readData();
+  const post = posts.find((p) => p.id === id);
+  if (!post) {
+    return res.status(404).json({ error: '게시글을 찾을 수 없습니다.' });
+  }
+  post.pinned = !!pinned;
+  writeData(posts);
+  res.json(toPublic(post));
 });
 
 // ---------- 관리자 인증 확인 ----------
