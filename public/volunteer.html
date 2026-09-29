@@ -1094,6 +1094,23 @@
       return div.innerHTML;
     }
 
+    // 본문 속 URL(https://... , www...)을 자동으로 클릭 가능한 링크로 바꿔줌
+    function linkify(str){
+      var escaped = escapeHtml(str || '');
+      var urlPattern = /((https?:\/\/|www\.)[^\s<]+)/g;
+      return escaped.replace(urlPattern, function(match){
+        var trailing = '';
+        var core = match;
+        var trailingMatch = core.match(/[.,!?)\]]+$/);
+        if (trailingMatch) {
+          trailing = trailingMatch[0];
+          core = core.slice(0, core.length - trailing.length);
+        }
+        var href = core.indexOf('http') === 0 ? core : 'https://' + core;
+        return '<a href="' + href + '" target="_blank" rel="noopener noreferrer">' + core + '</a>' + trailing;
+      });
+    }
+
     var PAGE_SIZE = 10;
     var currentPage = 1;
     var searchField = 'all';
@@ -1260,7 +1277,7 @@
       td.colSpan = 5;
 
       if (full.pinned) {
-        var contentHtml = escapeHtml(full.content || '').replace(/\n/g, '<br>');
+        var contentHtml = linkify(full.content || '');
         var actionsHtml = '';
         if (boardAdminKey) {
           actionsHtml =
@@ -1273,7 +1290,7 @@
           '<div style="padding:6px 2px;white-space:pre-wrap;line-height:1.8;">' + contentHtml + '</div>' + actionsHtml;
       } else {
         var extraContent = full.content
-          ? '<dt>내용</dt><dd style="white-space:pre-wrap;">' + escapeHtml(full.content).replace(/\n/g, '<br>') + '</dd>'
+          ? '<dt>내용</dt><dd style="white-space:pre-wrap;">' + linkify(full.content) + '</dd>'
           : '';
         td.innerHTML =
           '<dl class="detail-grid">' +

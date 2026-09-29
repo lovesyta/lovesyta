@@ -1053,6 +1053,23 @@
       return div.innerHTML;
     }
 
+    // 본문 속 URL(https://... , www...)을 자동으로 클릭 가능한 링크로 바꿔줌
+    function linkify(str){
+      var escaped = escapeHtml(str || '');
+      var urlPattern = /((https?:\/\/|www\.)[^\s<]+)/g;
+      return escaped.replace(urlPattern, function(match){
+        var trailing = '';
+        var core = match;
+        var trailingMatch = core.match(/[.,!?)\]]+$/);
+        if (trailingMatch) {
+          trailing = trailingMatch[0];
+          core = core.slice(0, core.length - trailing.length);
+        }
+        var href = core.indexOf('http') === 0 ? core : 'https://' + core;
+        return '<a href="' + href + '" target="_blank" rel="noopener noreferrer">' + core + '</a>' + trailing;
+      });
+    }
+
     function setAdminUI(){
       document.querySelectorAll('.article-board').forEach(function(root){
         var adminOnly = root.getAttribute('data-admin-only') === 'true';
@@ -1218,7 +1235,7 @@
           imagesEl.appendChild(img);
         });
 
-        root.querySelector('.article-content').textContent = a.content || '';
+        root.querySelector('.article-content').innerHTML = linkify(a.content || '');
 
         var sourceEl = root.querySelector('.article-source');
         if (a.sourceUrl) {
